@@ -13,6 +13,17 @@ export function createAccessToken(userId:string,role:"user"|"admin",tokenVersion
         )
 }
 
+export function verifyAccessToken(token:string){
+        return jwt.verify(
+                token,
+                process.env.JWT_ACCESS_SECRET! 
+        ) as {
+                sub:string;
+                role:"user"|"admin";
+                tokenVersion:number
+        }
+}
+
 export function createRefreshToken(userId:string,tokenVersion:number){
 
         const payload = {sub:userId,tokenVersion}
@@ -26,3 +37,13 @@ export function createRefreshToken(userId:string,tokenVersion:number){
         )
 }
 
+
+export function verifyRefreshToken(token:string){
+        return jwt.verify(
+                token,
+                process.env.JWT_ACCESS_SECRET! 
+        ) as {
+                sub:string;
+                tokenVersion:number
+        }
+}
