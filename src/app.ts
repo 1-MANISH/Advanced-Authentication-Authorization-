@@ -8,7 +8,7 @@ import cookieParser from "cookie-parser"
 import authRouter from "./routes/auth.routes"
 import userRouter from "./routes/user.routes"
 import adminRouter from "./routes/admin.routes"
-
+import googleAuthRouter from "./routes/google.auth.routes"
 // express application
 const app = express()
 
@@ -27,5 +27,6 @@ app.get('/health',(req,res)=>{
 app.use('/auth',authRouter)
 app.use('/user',userRouter)
 app.use('/admin',adminRouter)
+app.use('/auth/google',googleAuthRouter)
 
 export default app
