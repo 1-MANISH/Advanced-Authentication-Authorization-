@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken"
 import { sendEmail } from '../../lib/email'
 import { createAccessToken, createRefreshToken, verifyRefreshToken } from '../../lib/token'
 import crypto from "crypto"
+import {authenticator} from "otplib"
 
 
 function getAppUrl(){
@@ -157,7 +158,7 @@ export  async function loginHandler(req:Request,res:Response){
                         })
                 }
 
-                const {email,password}  = result.data
+                const {email,password,twoFactorCode}  = result.data
 
                 const normalizedEmail = email.toLowerCase().trim()
 
@@ -181,6 +182,32 @@ export  async function loginHandler(req:Request,res:Response){
                         return res.status(400).json({
                                 message:"Please verify your email , before login"
                         })
+                }
+
+                // 2 factor auth
+                if(user.twoFactorEnabled){
+
+                        if(!twoFactorCode || typeof twoFactorCode !== 'string'){
+                                return res.status(400).json({
+                                        message:"Two factor code is missing"
+                                })
+                        }
+
+                        if(!user.twoFactorSecret){
+                                return res.status(400).json({
+                                        message:"Two factor is mis configured for this account"
+                                })
+                        }
+
+                        // verify the two factor code using otp lib
+
+                        const isValid = authenticator.check(twoFactorCode,user.twoFactorSecret)
+
+                        if(!isValid){
+                                return res.status(400).json({
+                                        message:"Invalid two factor code"
+                                })
+                        }
                 }
 
                 const accessToken = createAccessToken(user._id.toString(),user.role,user.tokenVersion)
@@ -391,6 +418,105 @@ export async function resetPasswordHandler(req:Request,res:Response){
 
         } catch (error) {
                  console.log(`Error resetting  password handler : ${error}`)
+                return res.status(500).json({
+                        message:"Internal Server error Something went wrong",
+                        error
+                })
+        }
+}
+
+// set two factor
+export async function twoFASetupHandler(req:Request,res:Response){
+
+
+        try {
+                const authReq = req as any
+                const authUser = authReq.user
+
+                if(!authUser){
+                        return res.status(401).json({message:'Not authenticated user'})
+                }
+                
+                const user = await User.findById(authUser.id)
+
+                if(!user){
+                        return res.status(401).json({message:'User not found'})
+                }
+
+                // if(user.twoFactorEnabled){
+                //         return res.status(400).json({message:'Two factor already enabled'})
+                // }
+
+                // generate secret
+                const secret = authenticator.generateSecret()
+                const issuer = 'NodeAdvancedAuthAPP'
+                const optAuthUrl = authenticator.keyuri(user.email,issuer,secret)// generate otp auth url - qrcode
+
+                user.twoFactorSecret = secret
+                user.twoFactorEnabled = false // we need to verify it using code
+
+                await user.save()
+
+                return res.status(200).json({
+                        message:'Two factor setup successfully',
+                        optAuthUrl,// we need to create QR code
+                        secret
+                })
+
+
+        } catch (error) {
+                 console.log(`Error setting two  factor handler : ${error}`)
+                return res.status(500).json({
+                        message:"Internal Server error Something went wrong",
+                        error
+                })
+        }
+}
+
+
+export async function twoFAVerifyHandler(req:Request,res:Response){
+
+        try {
+                const authReq = req as any
+                const authUser = authReq.user
+
+                if(!authUser){
+                        return res.status(401).json({message:'Not authenticated user'})
+                }
+                
+                const {code} = req.body as {code?:string}
+
+                if(!code){
+                        return res.status(400).json({message:'2 Factor Code is missing'})
+                }
+
+                const user = await User.findById(authUser.id)
+
+                if(!user){
+                        return res.status(401).json({message:'User not found'})
+                }
+
+                if(!user.twoFactorSecret){
+                        return res.status(400).json({message:'Two factor not enabled, for you yet'})
+                }
+
+                const isValid = authenticator.check(code,user.twoFactorSecret)
+
+                if(!isValid){
+                        return res.status(400).json({message:'Invalid 2 Factor Code'})
+                }
+
+                user.twoFactorEnabled = true
+
+                await user.save()
+
+                return res.status(200).json({
+                        message:'Two factor verified successfully , Setup done for 2FA',
+                        twoFactorEnabled:true
+                })
+
+        } catch (error) {
+                console.log(`Error verify two  factor handler : ${error}`)
                 return res.status(500).json({
                         message:"Internal Server error Something went wrong",
                         error

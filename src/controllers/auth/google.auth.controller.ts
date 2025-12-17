@@ -25,12 +25,13 @@ export async function getGoogleClient(){
 
 // one start authentication function and one start callback
 
+// after we click on google login button - this function calls google auth start
 export async function googleAuthStartHandler(_req:Request,res:Response){
         try {
 
                 const client = await getGoogleClient()
 
-                // create scope  - what infor on success
+                // create scope  - what information on success
 
                 const url = client.generateAuthUrl({
                         access_type:"offline",
@@ -39,12 +40,11 @@ export async function googleAuthStartHandler(_req:Request,res:Response){
                 })
 
                 //  directly we can redirect to google login page
-
-                // postman - url as json
-                
+                // postman - url as json 
+                // return res.status(200).json({url})
                 return res.redirect(url)
 
-                // return res.status(200).json({url})
+      
 
         } catch (error) {
                 console.log(`Error while starting google auth: ${error}`)
@@ -111,7 +111,51 @@ export async function googleAuthCallbackHandler(req:Request,res:Response){
                                 twoFactorEnabled:false
                         })
 
-                        const accessToken = createAccessToken(
+                        // const accessToken = createAccessToken(
+                        //         user._id.toString(),
+                        //         user.role as "user" | "admin",
+                        //         user.tokenVersion
+                        // )
+
+                        // const refreshToken = createRefreshToken(
+                        //         user._id.toString(),
+                        //         user.tokenVersion
+                        // )
+
+                        // const isProd = process.env.NODE_ENV ==="production"
+
+                        // res.cookie(
+                        //         'refreshToken',
+                        //         refreshToken,
+                        //         {
+                        //                 httpOnly:true,
+                        //                 secure:isProd,
+                        //                 maxAge:7*24*60*60*1000,
+                        //                 sameSite:'lax'
+                        // })
+
+                        // return res.status(200).json({
+                        //         accessToken,
+                        //         message:'Google login successfully',
+                        //         user:{
+                        //                 name:user.name,
+                        //                 email:user.email,
+                        //                 id:user._id,
+                        //                 role:user.role
+                        //         }
+                        // })
+
+                }else{
+                        if(!user.isEmailVerified){
+
+                                user.isEmailVerified=true
+                                await user.save()
+
+                        }
+
+                        
+                }
+                const accessToken = createAccessToken(
                                 user._id.toString(),
                                 user.role as "user" | "admin",
                                 user.tokenVersion
@@ -132,7 +176,7 @@ export async function googleAuthCallbackHandler(req:Request,res:Response){
                                         secure:isProd,
                                         maxAge:7*24*60*60*1000,
                                         sameSite:'lax'
-                                })
+                        })
 
                         return res.status(200).json({
                                 accessToken,
@@ -144,15 +188,6 @@ export async function googleAuthCallbackHandler(req:Request,res:Response){
                                         role:user.role
                                 }
                         })
-
-                }else{
-                        if(!user.isEmailVerified){
-
-                                user.isEmailVerified=true
-                                await user.save()
-
-                        }
-                }
 
         } catch (error) {
                 console.log(`Error while callback google auth: ${error}`)
